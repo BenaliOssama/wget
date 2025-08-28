@@ -6,37 +6,42 @@ struct WgetCli {
     output: String,
     dest: Option<String>,
     speed_limit: Option<String>,
-    backgroung: bool,
-    quite: bool,
+    background: bool,
+    quiet: bool,
     mirror: bool,
 }
 
 impl WgetCli {
-    fn new() -> Self {
+    fn new(matches: &clap::ArgMatches) -> Self {
+        let output = "output".to_string();
+
         Self {
-            url: String::new(),
-            output: String::new(),
-            dest: None,
-            speed_limit: None,
-            backgroung: false,
-            quite: false,
-            mirror: false,
+            url: matches.get_one::<String>("url").unwrap().clone(),
+            output: matches
+                .get_one::<String>("output")
+                .unwrap_or(&output)
+                .clone(),
+            dest: matches.get_one::<String>("dest").map(|c| c.clone()),
+            quiet: matches.contains_id("quiet"),
+            mirror: matches.contains_id("mirror"),
+            background: matches.contains_id("background"),
+            speed_limit: matches.get_one::<String>("speed_limit").map(|c| c.clone()),
         }
     }
+
     fn execute(&self) {
+        // Placeholder for execution logic based on parsed arguments.
     }
 }
 
-fn main() {
-    let output = "output".to_string();
-    let matches = Command::new("wget")
+fn parse_args() -> clap::ArgMatches {
+    Command::new("wget")
         .version("1.0")
         .about("A basic wget clone in Rust")
         .arg(
             Arg::new("url")
                 .help("The URL to download")
-                .required(true)
-                // .index(1),
+                .required(true),
         )
         .arg(
             Arg::new("output")
@@ -80,18 +85,14 @@ fn main() {
                 .action(clap::ArgAction::SetTrue)
                 .help("Download in the background"),
         )
-        .get_matches();
-    let mut wget_cli = WgetCli::new();
-    wget_cli.url = matches.get_one::<String>("url").unwrap().clone();
-    wget_cli.output = matches
-        .get_one::<String>("output")
-        .unwrap_or(&output)
-        .clone();
-    wget_cli.dest = matches.get_one::<String>("dest").map(|c| c.clone());
-    wget_cli.quite = matches.contains_id("quiet");
-    wget_cli.mirror = matches.contains_id("mirror");
-    wget_cli.backgroung = matches.contains_id("background");
-    wget_cli.speed_limit = matches.get_one::<String>("speed_limit").map(|c| c.clone());
+        .get_matches()
+}
+
+fn main() {
+    let matches = parse_args();
+    let wget_cli = WgetCli::new(&matches);
+
     println!("{:?}", wget_cli);
+
     wget_cli.execute();
 }
