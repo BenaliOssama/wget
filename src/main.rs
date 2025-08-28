@@ -1,21 +1,26 @@
-use std::fs::File;
-use std::io::copy;
+use std::fs::OpenOptions;
+use daemonize::Daemonize;
+mod file;
+use file::background_downloading;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url = "http://example.com/file.zip";
-
-    // async request
-    let response = reqwest::get(url).await?;
-
-    // get response body as bytes
-    let bytes = response.bytes().await?;
-
-    // write to file
-    let mut file = File::create("file.zip")?;
-    copy(&mut bytes.as_ref(), &mut file)?;
-
-    println!("Downloaded file.zip successfully.");
-    Ok(())
+fn main() {
+    let stdout = OpenOptions::new()
+        .write(true)
+        .append(false)
+        .create(true)
+        .open("wget-log")
+        .unwrap();
+    let bg_process = Daemonize::new().stdout(stdout).working_directory(".");
+    match bg_process.start() {
+	Ok(_) => {
+	    background_downloading();
+	}
+	Err(_) => {
+	    println!("error");
+	}
+    }
 }
 
+fn download() {
+	
+}
