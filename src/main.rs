@@ -24,7 +24,6 @@ impl WgetCli {
         }
     }
     fn execute(&self) {
-        todo!()
     }
 }
 
