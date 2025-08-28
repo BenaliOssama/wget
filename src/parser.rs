@@ -13,7 +13,7 @@ pub struct WgetCli {
 
 impl WgetCli {
     pub fn new(matches: &clap::ArgMatches) -> Self {
-        let output = "output".to_string();
+        let output = "index.html".to_string();
 
         Self {
             url: matches.get_one::<String>("url").unwrap().clone(),
@@ -29,6 +29,11 @@ impl WgetCli {
         }
     }
 
+    pub fn handle_destination(&mut self) {
+        if let Some(destination) = &self.dest {
+            self.output = destination.to_string() + &self.output;
+        }
+    }
 
 }
 
