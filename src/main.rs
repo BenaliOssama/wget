@@ -4,6 +4,7 @@ mod utils;
 use tokio;
 use parser::*;
 use executer::*;
+use std::thread;
 
 #[tokio::main]
 
@@ -11,6 +12,15 @@ use executer::*;
 // show the limit..> https://example.com/file.zip 
 
 async fn main() {
+
+    println!("Download started in background"); 
+    thread::spawn(|| {
+        // call your async runtime here if needed
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+
+    /*______________________________________________________*/
+
+
     let matches = parse_args();
     let mut wget_cli = WgetCli::new(&matches);
     wget_cli.handle_destination();
@@ -20,4 +30,10 @@ async fn main() {
     if let Err(err) = wget_cli.apply_speed_limit().await {
         println!("in the main function: {}", err);
     }
+    /*______________________________________________________*/
+
+
+        });
+    });
+    println!("Download is going in background"); 
 }
