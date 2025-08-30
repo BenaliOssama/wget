@@ -77,10 +77,14 @@ async fn execute(&self) -> Result<(), reqwest::Error> {
         let client = Client::new();
         let urls = vec!["https://example.com/file1", "https://example.com/file2"];
 
-        let futures = urls.into_iter().map( |url| async {
-            let resp = client.get(url).send().await.unwrap();
-            let bytes = resp.bytes().await.unwrap();
-            bytes
+        // Clone the client for each async block
+        let futures = urls.into_iter().map(|url| {
+            let client = client.clone();
+            async move {
+                let resp = client.get(url).send().await.unwrap();
+                let bytes = resp.bytes().await.unwrap();
+                bytes
+            }
         });
 
         let results = join_all(futures).await;
