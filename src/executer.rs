@@ -1,6 +1,6 @@
 use crate::parser::WgetCli;
 use crate::utils::get_filename;
-
+use futures_util::future::join_all;
 use std::error::Error;
 
 
@@ -24,7 +24,7 @@ use tokio::time::{sleep, Duration};
 
 pub trait Executer {
     async fn execute(&self) -> Result<(), reqwest::Error>;
-    fn download(&self);
+    async fn download(&self);
     async fn apply_speed_limit(&self)-> Result<(), Box<dyn Error>>;
     fn mirror(&self);
 }
@@ -71,8 +71,21 @@ async fn execute(&self) -> Result<(), reqwest::Error> {
         Ok(())
     }
 
+    // Downloading multiple files at the same time,
+    // by reading a file containing multiple download links asynchronously
+    async fn download(&self) {
+        let client = Client::new();
+        let urls = vec!["https://example.com/file1", "https://example.com/file2"];
 
-    fn download(&self) {}
+        let futures = urls.into_iter().map( |url| async {
+            let resp = client.get(url).send().await.unwrap();
+            let bytes = resp.bytes().await.unwrap();
+            bytes
+        });
+
+        let results = join_all(futures).await;
+        println!("Downloaded {} files", results.len());
+    }
 
     fn mirror(&self) {}
 }
