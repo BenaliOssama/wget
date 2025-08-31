@@ -3,9 +3,10 @@ use clap::{Arg, Command};
 #[derive(Debug)]
 pub struct WgetCli {
     pub url: String,
+    pub urls_file: Option<String>,
     pub output: String,
     pub dest: Option<String>,
-    pub speed_limit: Option<String>,
+    pub speed_limit: Option<f64>,
     pub background: bool,
     pub quiet: bool,
     pub mirror: bool,
@@ -14,9 +15,10 @@ pub struct WgetCli {
 impl WgetCli {
     pub fn new(matches: &clap::ArgMatches) -> Self {
         let output = "index.html".to_string();
-
+        let speed_limit = matches.get_one::<String>("speed_limit").map(|c| c.clone());
         Self {
             url: matches.get_one::<String>("url").unwrap().clone(),
+            urls_file: matches.get_one::<String>("urls_file").map(|c| c.clone()).clone(),
             output: matches
                 .get_one::<String>("output")
                 .unwrap_or(&output)
@@ -25,7 +27,7 @@ impl WgetCli {
             quiet: matches.contains_id("quiet"),
             mirror: matches.contains_id("mirror"),
             background: matches.contains_id("background"),
-            speed_limit: matches.get_one::<String>("speed_limit").map(|c| c.clone()),
+            speed_limit: calcule_speed_limit(speed_limit),
         }
     }
 
@@ -37,6 +39,26 @@ impl WgetCli {
 
 }
 
+fn calcule_speed_limit(limit_option: Option<String>) -> Option<f64> {
+    if let Some(mut s) = limit_option {
+        let mut multiper = 1.0;
+        if s.ends_with(|v| v == 'k' || v == 'm' || v == 'g') {
+            multiper = mulipy(s.pop().unwrap());
+        }
+        return Some(s.parse::<f64>().expect("unvalid speed limit") * multiper);
+    }
+    None
+}
+
+fn mulipy(c: char) -> f64{
+    match c {
+        'k'=> 1024.0,
+        'm'=> 1024.0 * 1024.0,
+        'g'=> 1024.0 * 1024.0 * 1024.0,
+        _ => 1.0,
+    }
+}
+
 pub fn parse_args() -> clap::ArgMatches {
     Command::new("wget")
         .version("1.0")
@@ -45,6 +67,13 @@ pub fn parse_args() -> clap::ArgMatches {
             Arg::new("url")
                 .help("The URL to download")
                 .required(true),
+        )
+        .arg(
+            Arg::new("urls_file")
+                .short('i')
+                .long("input-file")
+                .help("urls file name")
+                .value_name("urls"),
         )
         .arg(
             Arg::new("output")
