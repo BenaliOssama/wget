@@ -93,7 +93,7 @@ pub fn parse_args() -> clap::ArgMatches {
             Arg::new("quiet")
                 .short('q')
                 .long("quiet")
-                .action(clap::ArgAction::SetTrue)
+                // .action(clap::ArgAction::SetTrue)
                 .help("Suppress output (quiet mode)"),
         )
         .arg(
@@ -114,7 +114,7 @@ pub fn parse_args() -> clap::ArgMatches {
             Arg::new("background")
                 .short('b')
                 .long("background")
-                .action(clap::ArgAction::SetTrue)
+                // .action(clap::ArgAction::SetTrue)
                 .help("Download in the background"),
         )
         .get_matches()
