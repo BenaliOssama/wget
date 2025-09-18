@@ -85,7 +85,7 @@ impl Executer for WgetCli {
         Ok(())
     }
 
-    async fn mirror(&self) -> Result<()> {
+    async fn mirror(&self) -> anyhow::Result<()> {
         self.log(&format!("Starting mirror of: {}", &self.url));
 
         let base_url = Url::parse(&self.url)?;
@@ -94,15 +94,24 @@ impl Executer for WgetCli {
 
         let client = Client::new();
 
+        // Base directory = hostname or "mirror"
+        let base_url_dir = base_url.host_str().unwrap_or("mirror");
+        fs::create_dir_all(base_url_dir).await?;
+
         while let Some(current_url) = urls_to_visit.pop() {
             if visited_urls.contains(&current_url) {
                 continue;
             }
-
             visited_urls.insert(current_url.clone());
             self.log(&format!("Mirroring: {}", current_url));
 
-            let response = client.get(&current_url).send().await?;
+            let response = match client.get(&current_url).send().await {
+                Ok(r) => r,
+                Err(e) => {
+                    self.log(&format!("Failed to request {}: {}", current_url, e));
+                    continue;
+                }
+            };
 
             if !response.status().is_success() {
                 self.log(
@@ -111,56 +120,61 @@ impl Executer for WgetCli {
                 continue;
             }
 
-            // Apply speed limit to mirror downloads
+            // Setup download stream
             let mut stream = response.bytes_stream();
-            let rate_limit = if let Some(limit) = self.speed_limit { limit } else { f64::MAX };
+            let rate_limit = self.speed_limit.unwrap_or(f64::MAX);
 
-            // Create directory structure based on URL path
-            let base_url_dir = base_url.host_str().unwrap_or("mirror");
-            fs::create_dir(base_url_dir).await?;
-
+            // Parse URL to build local path
             let parsed_url = Url::parse(&current_url)?;
             let path = parsed_url.path();
-            let local_path = format!(".{}", path);
-
-            if let Some(parent) = Path::new(&local_path).parent() {
-                tokio::fs::create_dir_all(parent).await?;
-            }
-            let base_url_dir_name = Path::new(&base_url_dir)
-                .file_name()
-                .and_then(|os_str| os_str.to_str())
-                .unwrap();
-            let filename = if path.ends_with('/') || path.is_empty() {
-                format!("{}/{}index.html", base_url_dir_name, local_path)
+            let local_path = if path == "/" || path.is_empty() {
+                "index.html".to_string()
             } else {
-                local_path
+                let mut p = path.trim_start_matches('/').replace("?", "_").replace("#", "_");
+                if p.ends_with('/') {
+                    p.push_str("index.html");
+                } else if Path::new(&p).extension().is_none() {
+                    p.push_str(".html");
+                }
+
+                p
             };
+
+            // Final filename = base_dir + local_path
+            let filename = format!("{}/{}", base_url_dir, local_path);
+            if let Some(parent) = Path::new(&filename).parent() {
+                fs::create_dir_all(parent).await?;
+            }
+
+            self.log(&format!("Saving: {}", filename));
             let mut file = File::create(&filename).await?;
             let mut content = Vec::new();
 
-            // Download with speed limit
+            // Download with optional rate limiting
             while let Some(chunk) = stream.next().await {
                 let chunk = chunk?;
-                let delay = Duration::from_secs_f64((chunk.len() as f64) / rate_limit);
-                if delay > Duration::ZERO {
-                    sleep(delay).await;
+                if rate_limit.is_finite() && rate_limit > 0.0 {
+                    let delay = Duration::from_secs_f64((chunk.len() as f64) / rate_limit);
+                    if delay > Duration::ZERO {
+                        sleep(delay).await;
+                    }
                 }
                 file.write_all(&chunk).await?;
                 content.extend_from_slice(&chunk);
             }
 
-            // Extract links from HTML content for further mirroring
+            // Parse links only if looks like HTML
             let content_str = String::from_utf8_lossy(&content);
-            if content_str.contains("<html") || content_str.contains("<!DOCTYPE") {
+            let lowered = content_str.to_ascii_lowercase();
+            if lowered.contains("<html") || lowered.contains("<!doctype") {
                 let links = extract_links(&content_str, &base_url);
                 for link in links {
-                    if
-                        !visited_urls.contains(&link) &&
-                        Url::parse(&link)
-                            .map(|u| u.host() == base_url.host())
-                            .unwrap_or(false)
-                    {
-                        urls_to_visit.push(link);
+                    if !visited_urls.contains(&link) {
+                        if let Ok(u) = Url::parse(&link) {
+                            if u.host() == base_url.host() {
+                                urls_to_visit.push(link);
+                            }
+                        }
                     }
                 }
             }
