@@ -1,6 +1,8 @@
 use std::fs::File;
-use std::io::{Result, Write};
+use std::io::{self, BufRead};
 use url::Url;
+use std::path::Path;
+use anyhow::Result;
 
 pub fn get_filename(url_str: &str) -> String {
     match Url::parse(url_str) {
@@ -20,3 +22,15 @@ pub fn get_filename(url_str: &str) -> String {
 }
 
 
+pub fn get_urls<P: AsRef<Path>>(path: P) -> Result<Vec<String>> {
+    let file = File::open(path)?;
+    let reader = io::BufReader::new(file);
+
+    let urls = reader
+        .lines()
+        .filter_map(|line| line.ok())   // ignore lines that failed to read
+        .filter(|line| !line.trim().is_empty()) // skip empty lines
+        .collect::<Vec<String>>();
+
+    Ok(urls)
+}

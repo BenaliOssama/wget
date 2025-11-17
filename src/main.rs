@@ -24,11 +24,9 @@ async fn main() {
     let matches = parse_args();
     let mut wget_cli = WgetCli::new(&matches);
     wget_cli.handle_destination();
+    println!("{:?}", wget_cli);
     if let Err(err) = wget_cli.execute().await {
-        println!("in the main function: {}", err);
-    }
-    if let Err(err) = wget_cli.apply_speed_limit().await {
-        println!("in the main function: {}", err);
+        println!("in the main : {}", err);
     }
     /*______________________________________________________*/
 
